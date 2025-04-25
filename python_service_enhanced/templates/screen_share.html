@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مشاركة الشاشة - معلمي الذكي</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+            direction: rtl;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #1e88e5;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+            margin-bottom: 20px;
+        }
+        .screen-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .screen-view {
+            width: 100%;
+            max-width: 1000px;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .btn-primary {
+            background-color: #1e88e5;
+            color: white;
+        }
+        .btn-danger {
+            background-color: #e53935;
+            color: white;
+        }
+        .btn-success {
+            background-color: #43a047;
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .status-connected {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status-disconnected {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .chat-container {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        .chat-messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .message-user {
+            background-color: #e3f2fd;
+            text-align: left;
+        }
+        .message-ai {
+            background-color: #f1f8e9;
+            text-align: right;
+        }
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>مشاركة الشاشة - معلمي الذكي</h1>
+            <p>يمكنك مشاركة شاشتك مع المعلم الافتراضي للحصول على المساعدة</p>
+        </div>
+        
+        <div class="screen-container">
+            <img id="screen-image" class="screen-view" src="/static/placeholder.png" alt="مشاركة الشاشة">
+            
+            <div class="controls">
+                <button id="start-btn" class="btn btn-primary">بدء المشاركة</button>
+                <button id="stop-btn" class="btn btn-danger" disabled>إيقاف المشاركة</button>
+                <button id="capture-btn" class="btn btn-success" disabled>التقاط صورة</button>
+            </div>
+            
+            <div id="status" class="status status-disconnected">
+                غير متصل
+            </div>
+        </div>
+        
+        <div class="chat-container">
+            <h2>المحادثة مع المعلم</h2>
+            <div id="chat-messages" class="chat-messages">
+                <div class="message message-ai">
+                    مرحباً! أنا معلمك الافتراضي. يمكنني مساعدتك في فهم ما تراه على شاشتك. قم بمشاركة شاشتك وسأقدم لك المساعدة.
+                </div>
+            </div>
+            <div class="chat-input">
+                <input type="text" id="message-input" placeholder="اكتب رسالتك هنا...">
+                <button id="send-btn" class="btn btn-primary">إرسال</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const socket = io();
+            const screenImage = document.getElementById('screen-image');
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const captureBtn = document.getElementById('capture-btn');
+            const statusDiv = document.getElementById('status');
+            const chatMessages = document.getElementById('chat-messages');
+            const messageInput = document.getElementById('message-input');
+            const sendBtn = document.getElementById('send-btn');
+            
+            let isSharing = false;
+            let captureInterval;
+            
+            // بدء مشاركة الشاشة
+            startBtn.addEventListener('click', function() {
+                socket.emit('start_screen_share', {});
+                isSharing = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                captureBtn.disabled = false;
+                statusDiv.className = 'status status-connected';
+                statusDiv.textContent = 'متصل - جاري مشاركة الشاشة';
+                
+                // بدء التقاط الشاشة كل ثانية
+                captureInterval = setInterval(function() {
+                    socket.emit('capture_screen', {});
+                }, 1000);
+                
+                addMessage('بدأت مشاركة الشاشة', 'user');
+            });
+            
+            // إيقاف مشاركة الشاشة
+            stopBtn.addEventListener('click', function() {
+                socket.emit('stop_screen_share', {});
+                isSharing = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                captureBtn.disabled = true;
+                statusDiv.className = 'status status-disconnected';
+                statusDiv.textContent = 'غير متصل';
+                
+                // إيقاف التقاط الشاشة
+                clearInterval(captureInterval);
+                
+                addMessage('توقفت مشاركة الشاشة', 'user');
+            });
+            
+            // التقاط صورة واحدة
+            captureBtn.addEventListener('click', function() {
+                socket.emit('capture_screen', {});
+                addMessage('تم التقاط صورة من الشاشة', 'user');
+            });
+            
+            // إرسال رسالة
+            sendBtn.addEventListener('click', sendMessage);
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            function sendMessage() {
+                const message = messageInput.value.trim();
+                if (message) {
+                    socket.emit('message', { text: message });
+                    addMessage(message, 'user');
+                    messageInput.value = '';
+                }
+            }
+            
+            // استقبال صورة الشاشة
+            socket.on('screen_image', function(data) {
+                screenImage.src = 'data:image/jpeg;base64,' + data.image;
+            });
+            
+            // استقبال رسالة من المعلم
+            socket.on('ai_response', function(data) {
+                addMessage(data.text, 'ai');
+            });
+            
+            // إضافة رسالة إلى المحادثة
+            function addMessage(text, sender) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message message-' + sender;
+                messageDiv.textContent = text;
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>
